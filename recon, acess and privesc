@@ -1,0 +1,39 @@
+https://github.com/kesselbach/TryHackMe-Boxes/tree/master/Tartarus 
+
+// RECON //
+Na początek skan nmapem, dowiadujemy się z niego że otwarte są 3 porty - 21 czyli ftp, 22 czyli ssh no i 70 na którym działa server OpenSSH. 
+Dowiadujemy się też że logowanie do ftp nie wymaga żadnych danych więc logujemy się za pomocą anonymous. 
+Dzięki temu uzyskaliśmy dostęp do sekretnej biblioteki której nazwa była na koncie FTP, wchodzimy w nią więc i odpalamy gobuster 
+
+
+// GAINING ACESS // 
+Korzystamy z hydry aby bruteforceować hasło ponieważ mamy nazwe użytkownika i listę haseł do strony, syntax:
+hydra 10.10.3.149 -L userid -P credentials.txt http-post-form "/sUp3r-s3cr3t/authenticate.php/:username=^USER^&password=^PASS^&Login=Login:F=Incorrect*"
+
+Dzięki brute force'owi udaje nam się znaleźć hasło, logujemy się więc na strone a na niej widzimy że możemy uploadować jakiś plik. 
+Od razu na myśl rzuca się po prostu wrzucenie reverse php, ale aby połączenie się nawiązało musimy go również odpalić, a do tego trzeba mieć link do miejsca gdzie uploadowane pliki są przechowywanem. 
+Uploadujemy nasz reverse shell i odpalamy go a w terminalu włączamy netcata. Udało się, nawiązaliśmy shell
+
+Mamy tutaj doczynienia z wielopoziomowym, vertical escalation, czyli stajemy się kilka razy użytkownikiem wyżej postawionym od nas aby w końcu stać się rootem. 
+
+Kiedy nawiązaliśmy shell staliśmy się userem1, musimy zespawnować nasz shell za pomocą:
+python -c 'import pty;pty.spawn("bin/bash")'
+
+Wpiszmy sudo -l, widzimy że inny użytkownik może odpalić gdb z /var/www/gdb. Zobaczmy czy możemy rozszerzyć nasze uprawnienia z pomocą tego, logujemy się na konto tego użytkownika:
+sudo -u thirtytwo /var/www/gdb -nx -ex '!sh' -ex quit - 
+
+Ponownie spawnimy nasz shell:
+python -c 'import pty;pty.spawn("bin/bash")'
+
+Jestesmy teraz użytkownikiem thirtytwo, ponownie wpisujemy sudo -l aby zobaczyć co możemy zrobić, widzimy że możemy odpalić /usr/bin/git z d4rckh privileges:
+sudo -u d4rckh /usr/bin/git help config
+
+spawnimy shell
+!/bin/sh
+
+Teraz musimy stać się rootem, widzimy w etc/crontab (tabeli rzeczy które wykonują się co jakiś czas automatycznie w systemie) i widzimy że jest tam skrypt cleanup.py który możemy odpalić jako root, więc edytujemy ten skrypt na nasz shell i łączymy się z pomocą netcata, w ten sposób mamy roota 
+
+
+
+
+
